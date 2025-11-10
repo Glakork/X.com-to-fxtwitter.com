@@ -3,7 +3,6 @@
   if (window.__x_to_fx_sharefix__) return;
   window.__x_to_fx_sharefix__ = true;
 
-  // ---- helpers ----
   const hostSwap = /(https?:\/\/)(?:www\.|mobile\.)?(?:x\.com|twitter\.com)\//gi;
   const toFx = (s) => (typeof s === 'string' ? s.replace(hostSwap, '$1fxtwitter.com/') : s);
 
@@ -17,7 +16,6 @@
     } catch { return false; }
   }
 
-  // find a tweet path near an element (or from current page)
   function findTweetPath(start) {
     try {
       const p = location.pathname;
@@ -25,13 +23,11 @@
     } catch {}
     let el = start;
     for (let i = 0; el && i < 24; i++, el = el.parentElement) {
-      // strict: a direct permalink-looking anchor
       const a1 = el.querySelector?.('a[href^="/"][href*="/status/"]');
       if (a1) {
         const h = a1.getAttribute('href');
         if (h && /^\/[^\/]+\/status\/\d+/.test(h)) return h;
       }
-      // x often wraps tweets in role=article
       if (el?.getAttribute?.('role') === 'article') {
         const a2 = el.querySelector?.('a[href^="/"][href*="/status/"]');
         if (a2) {
@@ -48,7 +44,6 @@
     return (location.protocol || 'https:') + '//fxtwitter.com' + path.replace(/^\/+/, '/');
   }
 
-  // track last click/context targets to anchor the share menu to a tweet
   let lastPointerTarget = null;
   ['mousedown', 'pointerdown', 'contextmenu'].forEach(evt =>
     window.addEventListener(evt, (e) => {
@@ -57,7 +52,6 @@
     }, true)
   );
 
-  // ----- clipboard hooks (keep as-is; they already fix video/gif) -----
   const clip = navigator.clipboard;
   if (clip) {
     hardPatchMethod(clip, 'writeText', (orig) => function (text) { return orig(toFx(text)); });
@@ -135,7 +129,6 @@
     }
   }
 
-  // legacy copy path (harmless if not used)
   function rewriteEventClipboard(dt) {
     if (!dt) return;
     try {
@@ -157,11 +150,8 @@
   window.addEventListener('copy', (e) => rewriteEventClipboard(e.clipboardData), false);
   window.addEventListener('cut',  (e) => rewriteEventClipboard(e.clipboardData), false);
 
-  // ---- targeted fix: intercept ONLY “Share → Copy link” menu item ----
-  // we **don’t** block the click unless we successfully write the fx URL.
   function isShareCopyLinkItem(node) {
     if (!node) return false;
-    // climb a few levels; menu items often have role="menuitem"
     let el = node;
     for (let i = 0; i < 6 && el; i++, el = el.parentElement) {
       const role = el.getAttribute?.('role');
@@ -169,7 +159,7 @@
       const dtid = (el.getAttribute?.('data-testid') || '').toLowerCase();
       const looksMenu = role === 'menuitem' || /menu/.test(dtid);
       const saysCopyLink =
-        /copy/.test(text) && /link/.test(text) && !/video|gif/.test(text); // exclude video/gif which already work
+        /copy/.test(text) && /link/.test(text) && !/video|gif/.test(text); 
       const idish = /copy\-link/.test(dtid) || /share.*copy.*link/.test(dtid);
       if (looksMenu && (saysCopyLink || idish)) return el;
     }
@@ -182,14 +172,12 @@
     const item = isShareCopyLinkItem(t);
     if (!item) return;
 
-    // compute tweet path from context (last pointer target near the tweet)
     const path = findTweetPath(lastPointerTarget || t) ||
                  (/^\/[^\/]+\/status\/\d+/.test(location.pathname) ? location.pathname : null);
     const fx = buildFxFromPath(path);
 
-    if (!fx) return; // let X handle it if we can't be sure
+    if (!fx) return;
 
-    // attempt to write; only stop the event if we succeed (so the button still works if we fail)
     let blocked = false;
     const write = async () => {
       try {
@@ -213,11 +201,9 @@
         ev.stopImmediatePropagation();
       }
     };
-    // run immediately within the same gesture
     write();
   }, true);
 
-  // ---- rewrite anchors (unchanged) ----
   function rewriteLinks(root) {
     if (!root || !root.querySelectorAll) return;
     const links = root.querySelectorAll('a[href*="x.com/"],a[href*="twitter.com/"],a[href*="mobile.twitter.com/"]');
@@ -247,3 +233,4 @@
   });
   try { mo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] }); } catch {}
 })();
+
