@@ -1,7 +1,6 @@
 (function () {
   'use strict';
 
-  // ---------- helpers ----------
   const hostSwap = /(https?:\/\/)(?:www\.|mobile\.)?(?:x\.com|twitter\.com)\//gi;
   const toFx = (val) => (typeof val === 'string' ? val.replace(hostSwap, '$1fxtwitter.com/') : val);
 
@@ -25,7 +24,6 @@
     catch { return null; }
   };
 
-  // ---------- 1) patch navigator.clipboard ----------
   const clip = navigator.clipboard;
   if (clip) {
     // writeText
@@ -38,7 +36,6 @@
       } catch {}
     }
 
-    // write(ClipboardItem[])
     const origWrite = safelyBind(clip, 'write');
     if (origWrite) {
       try {
@@ -55,12 +52,10 @@
     }
   }
 
-  // ---------- 2) wrap ClipboardItem constructor ----------
   const NativeClipboardItem = window.ClipboardItem;
   async function wrapClipboardItem(item) {
     if (!NativeClipboardItem || !item || typeof item !== 'object') return item;
 
-    // spec allows a map of mime -> Blob | Promise<Blob> | () => Promise<Blob>
     const types = {};
     try {
       const entries = item.types ? item.types.map((t) => [t, item.getType(t)]) : Object.entries(item);
@@ -84,7 +79,6 @@
   if (NativeClipboardItem) {
     try {
       const Wrapped = function ClipboardItemShim(items) {
-        // normalize to a plain object so we can intercept text types
         const norm = {};
         try {
           for (const [k, v] of Object.entries(items || {})) {
@@ -106,10 +100,8 @@
     } catch {}
   }
 
-  // ---------- 3) intercept copy events (capture + bubble) ----------
   const onCopyCapture = (e) => {
     try {
-      // do nothing here; let site populate first
     } catch {}
   };
 
@@ -117,33 +109,27 @@
     try {
       const dt = e.clipboardData;
       if (!dt) return;
-      // rewrite after X has set the payload
       const changed = rewriteIfChanged(dt);
       if (changed) {
-        // ensure our modified payload sticks
         e.stopImmediatePropagation?.();
       }
     } catch {}
   };
 
-  window.addEventListener('copy', onCopyCapture, true);  // capture
-  window.addEventListener('copy', onCopyBubble, false);  // bubble
+  window.addEventListener('copy', onCopyCapture, true); 
+  window.addEventListener('copy', onCopyBubble, false);  
   window.addEventListener('cut', onCopyBubble, false);
 
-  // ---------- 4) patch execCommand('copy') fallback ----------
   const origExec = safelyBind(document, 'execCommand');
   if (origExec) {
     try {
       document.execCommand = function (cmd, ...rest) {
         const res = origExec(cmd, ...rest);
-        // a 'copy' event should have fired; nothing to do if blocked, but try a microtask tweak
         if (String(cmd).toLowerCase() === 'copy') {
           queueMicrotask(() => {
-            // try to trigger a synthetic 'copy' with our handler if the site prevented default too early
             try {
               const ev = new ClipboardEvent('copy', { bubbles: true, cancelable: true });
               if (document.dispatchEvent(ev)) {
-                // no one handled it; nothing we can do without read access
               }
             } catch {}
           });
@@ -153,7 +139,6 @@
     } catch {}
   }
 
-  // ---------- 5) rewrite hrefs on the page ----------
   function rewriteLinks(root) {
     if (!root || !root.querySelectorAll) return;
     const links = root.querySelectorAll(
@@ -197,6 +182,6 @@
     });
   } catch {}
 
-  // keep a trivial listener alive to ensure our script stays active across SPA transitions
   document.addEventListener('click', () => {}, true);
 })();
+
